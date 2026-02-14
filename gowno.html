@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLA 206: Misja Chełm</title>
+    <style>
+        :root {
+            --cla-green: #006837; /* Zielony kolor autobusów */
+            --cla-yellow: #ffcc00;
+            --hud-bg: #2c3e50;
+            --phone-bg: #1a1a1a;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #111;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" transform="scale(0.5)" opacity="0.1" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M50 0L100 100H0Z" fill="white"/></svg>');
+        }
+
+        #game-container {
+            width: 900px;
+            height: 600px;
+            background: linear-gradient(to bottom, #87CEEB 40%, #555 40%);
+            position: relative;
+            border: 4px solid var(--cla-green);
+            border-radius: 10px;
+            box-shadow: 0 0 50px rgba(0, 255, 0, 0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Widok z szyby */
+        #windshield {
+            flex: 1;
+            position: relative;
+            background-size: cover;
+            background-position: center;
+            transition: filter 0.5s;
+        }
+
+        .road-animation {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                90deg, 
+                transparent 0, 
+                transparent 48%, 
+                #fff 48%, 
+                #fff 52%, 
+                transparent 52%, 
+                transparent 100%
+            );
+            background-size: 100px 100%;
+            opacity: 0.3;
+            transform: perspective(300px) rotateX(45deg);
+            animation: drive 1s linear infinite;
+            display: none;
+        }
+
+        @keyframes drive {
+            from { background-position: 0 0; }
+            to { background-position: 0 100px; }
+        }
+
+        /* Kokpit */
+        #dashboard {
+            height: 250px;
+            background-color: #333;
+            border-top: 5px solid #111;
+            position: relative;
+            display: flex;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        /* Kierownica */
+        #steering-wheel {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            border: 15px solid #111;
+            position: absolute;
+            bottom: -50px;
+            left: 50px;
+            background: radial-gradient(circle, #333 30%, transparent 31%);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        
+        #steering-wheel::after { /* Logo na kierownicy */
+            content: "CLA";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--cla-green);
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        /* Panel Dialogowy */
+        #dialogue-box {
+            flex: 1;
+            margin-left: 220px; /* miejsce na kierownicę */
+            margin-right: 240px; /* miejsce na telefon */
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--cla-yellow);
+            border-radius: 5px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #text-content {
+            font-size: 16px;
+            line-height: 1.4;
+            margin-bottom: 10px;
+            color: #eee;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            background-color: var(--cla-green);
+            color: white;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: 0.2s;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: var(--cla-yellow);
+            color: black;
+        }
+
+        /* Smartfon CLA */
+        #phone {
+            width: 220px;
+            height: 380px;
+            background-color: var(--phone-bg);
+            border: 8px solid #444;
+            border-radius: 15px;
+            position: absolute;
+            right: 20px;
+            bottom: -50px; /* Trochę wystaje */
+            padding: 10px;
+            font-family: monospace;
+            box-shadow: -5px 5px 15px rgba(0,0,0,0.5);
+            transform: rotate(-5deg);
+            z-index: 20;
+            overflow: hidden;
+        }
+
+        #phone-header {
+            background: var(--cla-green);
+            color: white;
+            padding: 5px;
+            text-align: center;
+            font-size: 12px;
+            border-radius: 3px;
+            margin-bottom: 10px;
+        }
+
+        .bus-entry {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            border-bottom: 1px solid #333;
+            padding: 4px 0;
+            color: #ccc;
+        }
+
+        .bus-entry span:first-child { color: var(--cla-yellow); font-weight: bold; }
+        .late { color: red; }
+        .ontime { color: lime; }
+
+        /* Wskaźniki deski rozdzielczej */
+        .gauges {
+            position: absolute;
+            bottom: 10px;
+            left: 250px;
+            display: flex;
+            gap: 10px;
+            font-size: 12px;
+            color: var(--cla-yellow);
+        }
+
+        /* Bańkowszczyzna Vibe */
+        .scent-indicator {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.6);
+            padding: 5px;
+            border-radius: 5px;
+            font-size: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="windshield">
+        <div class="scent-indicator" id="perfume-status">Zapach: <span style="color: gold">Tajemnicza Woń</span></div>
+        <div class="road-animation" id="road"></div>
+        <h2 id="location-header" style="text-align: center; margin-top: 20px; text-shadow: 2px 2px 2px black;">ZAJEZDNIA CLA</h2>
+    </div>
+
+    <div id="dashboard">
+        <div id="steering-wheel"></div>
+        
+        <div class="gauges">
+            <div>Linia: 206</div>
+            <div>Paliwo: 15%</div>
+            <div>Cel: Lubelska McDonalds</div>
+        </div>
+
+        <div id="dialogue-box">
+            <div id="text-content">Witaj w Chełmie. Jesteś kierowcą legendarnego zielonego autobusu linii 206. Twoim celem jest Lubelska McDonalds, ale twoje serce bije dla Bańkowszczyzny. Silnik mruczy. Co robisz?</div>
+            <div class="options-grid" id="options">
+                <button onclick="startGame()">Odpal silnik (Ruszaaaamy!)</button>
+            </div>
+        </div>
+
+        <div id="phone">
+            <div id="phone-header">CLA LIVE MONITORING</div>
+            <div style="font-size: 10px; color: #888; text-align: center; margin-bottom: 5px;">Chełm - Centrum</div>
+            <div id="bus-schedule">
+                </div>
+            <div style="margin-top: 10px; font-size: 10px; color: #555; text-align: center;">Powered by ChełmNet</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- DANE I ZMIENNE ---
+    const locations = [
+        "Zajezdnia CLA", 
+        "Al. Armii Krajowej", 
+        "Wiadukt", 
+        "Rejowiecka", 
+        "Lubelska McDonalds"
+    ];
+    
+    // Dane do symulacji telefonu (imersja)
+    const otherBuses = [
+        { line: "2", dest: "Dworzec PKP", time: "12:04" },
+        { line: "12", dest: "Cementownia", time: "12:08" },
+        { line: "8", dest: "Szpital", time: "12:15" },
+        { line: "1", dest: "I AWP", time: "12:18" },
+        { line: "9", dest: "Ceramiczna", time: "12:22" }
+    ];
+
+    let gameState = {
+        step: 0,
+        perfumeFound: false, // czy gracz odpowiedział dobrze
+        knowsBankowszczyzna: false
+    };
+
+    // --- SILNIK GRY (LOGIKA) ---
+
+    // Symulacja telefonu na żywo
+    function updatePhone() {
+        const scheduleDiv = document.getElementById('bus-schedule');
+        scheduleDiv.innerHTML = '';
+        
+        otherBuses.forEach(bus => {
+            const delay = Math.floor(Math.random() * 5) - 2; // opóźnienie od -2 do +2
+            let statusClass = delay > 0 ? 'late' : 'ontime';
+            let statusText = delay > 0 ? `+${delay} min` : '>>';
+            
+            // Randomowe migotanie danych
+            if(Math.random() > 0.8) statusText = "...";
+
+            const row = document.createElement('div');
+            row.className = 'bus-entry';
+            row.innerHTML = `
+                <span>${bus.line} ${bus.dest}</span>
+                <span class="${statusClass}">${statusText}</span>
+            `;
+            scheduleDiv.appendChild(row);
+        });
+    }
+    
+    setInterval(updatePhone, 2000); // Odśwież telefon co 2 sekundy
+
+    // Funkcja zmiany scenerii
+    function setScene(text, options, bgType) {
+        const textDiv = document.getElementById('text-content');
+        const optionsDiv = document.getElementById('options');
+        const road = document.getElementById('road');
+        const header = document.getElementById('location-header');
+
+        textDiv.innerHTML = text;
+        optionsDiv.innerHTML = '';
+
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.innerText = opt.label;
+            btn.onclick = opt.action;
+            optionsDiv.appendChild(btn);
+        });
+
+        // Tło
+        if (bgType === 'driving') {
+            road.style.display = 'block';
+            document.getElementById('windshield').style.backgroundColor = '#87CEEB';
+        } else if (bgType === 'stop') {
+            road.style.display = 'none';
+            document.getElementById('windshield').style.backgroundColor = '#666'; // Szarość betonu
+        }
+    }
+
+    // --- FABUŁA ---
+
+    function startGame() {
+        setScene(
+            "Wyjeżdżasz z zajezdni. Zielony Solaris lśni w słońcu. Mijasz rondo przy Castoramie. Na przystanku 'Armii Krajowej / KFC' wsiada starsza pani w moherowym berecie. Siada zaraz za tobą.",
+            [
+                { label: "Jadę dalej, pełen chill", action: sceneBusRide },
+                { label: "Włączam radio 'Chełm FM'", action: sceneRadio }
+            ],
+            'driving'
+        );
+        document.getElementById('location-header').innerText = "ULICA REJOWIECKA";
+    }
+
+    function sceneRadio() {
+        setScene(
+            "W radiu leci Zenek, ale przerywają na wiadomości: 'W okolicach wsi Bańkowszczyzna widziano niezidentyfikowane obiekty latające. Sołtys twierdzi, że to bociany, ale one świeciły na neonowo'. Starsza Pani chrząka znacząco.",
+            [
+                { label: "Spojrzyj w lusterko", action: sceneBusRide }
+            ],
+            'driving'
+        );
+    }
+
+    function sceneBusRide() {
+        document.getElementById('perfume-status').style.display = 'block';
+        setScene(
+            "Starsza Pani pociąga nosem. <br><i>'Och, panie kierowco... Cóż za piękny zapach. To chyba ta nowa woda kolońska z Rossmanna? Taka wykwintna, ziemista nuta. Czyżby kosztowała całe 50 złotych?'</i>",
+            [
+                { label: "Tak, 50 zł, luksus!", action: () => resolvePerfume(false) },
+                { label: "Te perfumy się znalazło.", action: () => resolvePerfume(true) },
+                { label: "To zapach gnojowicy z Bańkowszczyzny.", action: () => resolvePerfume('bank') }
+            ],
+            'driving'
+        );
+    }
+
+    function resolvePerfume(result) {
+        if (result === true) {
+            gameState.perfumeFound = true;
+            setScene(
+                "Pani uśmiecha się szeroko, pokazując złoty ząb. <br><i>'Wiedziałam! Prawdziwy gospodarny chełmianin! Znalazione nie kradzione, a pachnie jak zwycięstwo!'</i> <br>Morale rośnie.",
+                [{ label: "Dojeżdżamy do celu", action: sceneArrival }],
+                'driving'
+            );
+        } else if (result === 'bank') {
+            gameState.knowsBankowszczyzna = true;
+            setScene(
+                "Pani mruga okiem. <br><i>'Aaa, swój człowiek! Bańkowszczyzna... kraina mlekiem i miodem płynąca.'</i>",
+                [{ label: "Gaz do dechy!", action: sceneArrival }],
+                'driving'
+            );
+        } else {
+            setScene(
+                "Pani kręci nosem. <br><i>'50 złotych? Rozrzutność! Za moich czasów to by się pół świniaka kupiło.'</i> <br>Atmosfera w autobusie gęstnieje.",
+                [{ label: "Westchnij i jedź dalej", action: sceneArrival }],
+                'driving'
+            );
+        }
+    }
+
+    function sceneArrival() {
+        document.getElementById('location-header').innerText = "LUBELSKA / MCDONALDS";
+        document.getElementById('road').style.display = 'none';
+        
+        setScene(
+            "Dojeżdżasz na przystanek Lubelska McDonalds. Ludzie wysiadają, biegną po frytki. Ale jeden Pan – wygląda na zdenerwowanego, w ręku trzyma nadgryzionego Cheeseburgera – podbiega do twojej kabiny i wali w szybę.",
+            [{ label: "Otwórz drzwi", action: sceneProblem }],
+            'stop'
+        );
+    }
+
+    function sceneProblem() {
+        let dialogue = "<i>'PANIE! Co to ma być?!'</i> krzyczy mężczyzna. <i>'Patrzyłem na telefon, na ten cały system CLA, i miało być połączenie na Bańkowszczyznę! A ten autobus kończy bieg tutaj?! Ja muszę do szwagra na żniwa!'</i>";
+        
+        let opts = [
+            { label: "To jest linia 206, tu jest koniec.", action: endNormal },
+            { label: "Sprawdź telefon (oszukaj go)", action: endSmart }
+        ];
+
+        if (gameState.perfumeFound || gameState.knowsBankowszczyzna) {
+            opts.push({ label: "[SEKRET] Porwij autobus na Bańkowszczyznę", action: endLegend });
+        }
+
+        setScene(dialogue, opts, 'stop');
+    }
+
+    // --- ZAKOŃCZENIA ---
+
+    function endNormal() {
+        setScene(
+            "**KONIEC: SŁUŻBISTA**<br>Wyjaśniasz Panu, że system kłamie, a 206 to linia miejska. Pan rzuca Cheeseburgerem w koło i idzie na piechotę. Wypłata się zgadza, ale Bańkowszczyzna pozostaje tylko marzeniem.",
+            [{ label: "Zagraj ponownie", action: resetGame }],
+            'stop'
+        );
+    }
+
+    function endSmart() {
+        setScene(
+            "**KONIEC: TECHNIK**<br>Pokazujesz mu swój telefon. 'Patrz Pan, tu jest napisane, że za 3 minuty podjedzie PKS Widmo'. Facet się uspokaja. Uratowałeś dzień sprytem.",
+            [{ label: "Zagraj ponownie", action: resetGame }],
+            'stop'
+        );
+    }
+
+    function endLegend() {
+        document.getElementById('location-header').innerText = "KIERUNEK: BAŃKOWSZCZYZNA";
+        document.body.style.backgroundColor = "gold";
+        setScene(
+            "**KONIEC: LEGENDA CHEŁMA**<br>Wrzucasz jedynkę. Mówisz przez mikrofon: 'Drodzy państwo, zmiana trasy. Jedziemy na Bańkowszczyznę!'. <br>Autobus wiwatuje. Starsza Pani wyciąga z torebki sękacza. Pan z McDonald's płacze ze szczęścia. Ten dzień przejdzie do historii.",
+            [{ label: "JESTEŚ BOGIEM (Restart)", action: resetGame }],
+            'driving'
+        );
+    }
+
+    function resetGame() {
+        location.reload();
+    }
+
+    // Start
+    updatePhone();
+
+</script>
+
+</body>
+</html>
