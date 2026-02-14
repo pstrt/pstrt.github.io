@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Symulator Linii 206: Kierunek Bańkowszczyzna?</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; color: white; }
+        
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Phone Panel */
+        #phone-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 220px;
+            height: 400px;
+            background: #1a1a1a;
+            border: 4px solid #333;
+            border-radius: 15px;
+            padding: 10px;
+            pointer-events: auto;
+            box-shadow: 0 0 15px rgba(0,255,0,0.2);
+            font-size: 11px;
+            overflow: hidden;
+        }
+        #phone-header { background: #004d00; padding: 5px; text-align: center; border-radius: 5px; margin-bottom: 5px; font-weight: bold; }
+        .bus-entry { border-bottom: 1px solid #444; padding: 4px 0; color: #ccc; }
+        .bus-entry span { color: #00ff00; font-weight: bold; }
+        .glitch { color: magenta !important; text-shadow: 1px 0 red; }
+
+        /* Dialog Box */
+        #dialog-box {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, 0);
+            width: 600px;
+            background: rgba(0, 40, 0, 0.95);
+            border: 2px solid #00ff00;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            pointer-events: auto;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        #dialog-text { font-size: 18px; margin-bottom: 20px; line-height: 1.5; }
+        .choice-btn {
+            background: #004400;
+            border: 1px solid #00ff00;
+            color: white;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+        .choice-btn:hover { background: #00ff00; color: black; }
+
+        /* HUD */
+        #hud { padding: 20px; font-size: 20px; text-shadow: 1px 1px 2px black; }
+        #speedometer { font-size: 32px; font-weight: bold; color: #00ff00; }
+        
+        /* Start Screen */
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            z-index: 100;
+        }
+        h1 { color: #00ff00; text-transform: uppercase; letter-spacing: 5px; margin-bottom: 10px; }
+        p { max-width: 600px; text-align: center; color: #aaa; }
+        #start-btn {
+            margin-top: 30px;
+            padding: 15px 40px;
+            background: #00ff00;
+            border: none;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            color: black;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1>Linia 206: The Chełm Chronicles</h1>
+        <p>Jesteś kierowcą zielonego autobusu CLA. Twoim celem jest przystanek <b>Lubelska McDonald's</b>.</p>
+        <p>Krążą legendy, że z Chełma da się dojechać bezpośrednio do mitycznej <b>Bańkowszczyzny</b>...</p>
+        <p>Sterowanie: <b>Strzałki Lewo/Prawo</b> aby zmieniać pasy. Unikaj innych aut.</p>
+        <button id="start-btn" onclick="startGame()">RUSZAJ W TRASĘ</button>
+    </div>
+
+    <div id="ui-layer">
+        <div id="hud">
+            <div>LINIA: 206 | KIERUNEK: LUBELSKA MCDONALD'S</div>
+            <div>PRĘDKOŚĆ: <span id="speedometer">0</span> km/h</div>
+            <div>DYSTANS: <span id="distance">0</span> m</div>
+        </div>
+
+        <div id="phone-panel">
+            <div id="phone-header">CLA LIVE SYSTEM</div>
+            <div id="schedule-content">
+                </div>
+        </div>
+
+        <div id="dialog-box">
+            <div id="dialog-text">Tekst dialogu...</div>
+            <div id="dialog-options"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // --- ZMIENNE GRY ---
+        let scene, camera, renderer;
+        let bus, road, buildings = [];
+        let cars = [];
+        let speed = 0;
+        let maxSpeed = 0.8;
+        let distance = 0;
+        let gameActive = false;
+        let eventStage = 0; // 0: Start, 1: Grandma, 2: Driving to McD, 3: Finale
+        let busLane = 0; // -1: lewy, 0: środek, 1: prawy
+        
+        // --- DANE CHEŁMSKIE I BAŃKOWSZCZYZNA ---
+        const claData = [
+            { line: "2", dest: "Dworzec PKP", time: "2 min" },
+            { line: "9", dest: "Cementownia", time: "5 min" },
+            { line: "12", dest: "Szpital", time: "ZAWOŁAJ" },
+            { line: "206", dest: "Lubelska McD", time: "TERAZ" },
+            { line: "666", dest: "BAŃKOWSZCZYZNA", time: "NIGDY", glitch: true },
+            { line: "1", dest: "Rejowiecka", time: "12 min" }
+        ];
+
+        // --- INICJALIZACJA THREE.JS ---
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x202025); // Noc/Wieczór w Chełmie
+            scene.fog = new THREE.Fog(0x202025, 10, 50);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 3, 6);
+            camera.lookAt(0, 0, -5);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Światło
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(5, 10, 5);
+            scene.add(light);
+            const ambient = new THREE.AmbientLight(0x404040);
+            scene.add(ambient);
+
+            // Droga (Ulica Lubelska)
+            const roadGeo = new THREE.PlaneGeometry(10, 200);
+            const roadMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+            road = new THREE.Mesh(roadGeo, roadMat);
+            road.rotation.x = -Math.PI / 2;
+            road.position.z = -50;
+            scene.add(road);
+
+            // Pasy na drodze
+            for(let i=0; i<20; i++) {
+                const stripGeo = new THREE.PlaneGeometry(0.2, 3);
+                const stripMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const strip = new THREE.Mesh(stripGeo, stripMat);
+                strip.rotation.x = -Math.PI / 2;
+                strip.position.set(0, 0.01, -i * 10);
+                scene.add(strip);
+            }
+
+            // Autobus (Zielony Solaris)
+            const busGeo = new THREE.BoxGeometry(1.8, 2, 4);
+            const busMat = new THREE.MeshPhongMaterial({ color: 0x00aa00 }); // Zielony Chełmski
+            bus = new THREE.Mesh(busGeo, busMat);
+            bus.position.y = 1;
+            scene.add(bus);
+
+            // Budynki (proceduralne tło)
+            for(let i=0; i<40; i++) {
+                createBuilding(-10 - Math.random()*10, -i * 10); // Lewa strona
+                createBuilding(10 + Math.random()*10, -i * 10);  // Prawa strona
+            }
+
+            animate();
+        }
+
+        function createBuilding(x, z) {
+            const h = 5 + Math.random() * 10;
+            const geo = new THREE.BoxGeometry(4, h, 4);
+            const mat = new THREE.MeshPhongMaterial({ color: 0x111111 }); // Ciemne budynki Chełma
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, h/2, z);
+            scene.add(mesh);
+            buildings.push(mesh);
+        }
+
+        // --- LOGIKA GRY ---
+
+        function startGame() {
+            document.getElementById('start-screen').style.display = 'none';
+            init3D();
+            startPhoneUpdates();
+            gameActive = true;
+            speed = 0.5;
+            
+            // Obsługa klawiszy
+            document.addEventListener('keydown', (e) => {
+                if (!gameActive) return;
+                if (e.key === 'ArrowLeft' && busLane > -1) {
+                    busLane--;
+                }
+                if (e.key === 'ArrowRight' && busLane < 1) {
+                    busLane++;
+                }
+            });
+        }
+
+        function updatePhone() {
+            const container = document.getElementById('schedule-content');
+            let html = '';
+            claData.forEach(bus => {
+                let time = bus.time;
+                // Losowe opóźnienia
+                if (Math.random() > 0.7 && !bus.glitch) time = (Math.floor(Math.random() * 10) + 1) + " min";
+                
+                let styleClass = bus.glitch ? "bus-entry glitch" : "bus-entry";
+                html += `<div class="${styleClass}">Linia <span>${bus.line}</span>: ${bus.dest} <div style="float:right">${time}</div></div>`;
+            });
+            
+            // Bańkowszczyzna easter egg
+            if (distance > 500) {
+                html += `<div class="bus-entry glitch">SYSTEM BŁĄD: KIERUNEK BAŃKOWSZCZYZNA WYKRYTY</div>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function startPhoneUpdates() {
+            updatePhone();
+            setInterval(updatePhone, 3000);
+        }
+
+        function triggerDialog(text, options) {
+            gameActive = false;
+            speed = 0;
+            const box = document.getElementById('dialog-box');
+            const txt = document.getElementById('dialog-text');
+            const opts = document.getElementById('dialog-options');
+            
+            txt.innerHTML = text;
+            opts.innerHTML = '';
+            box.style.display = 'block';
+
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.innerText = opt.label;
+                btn.onclick = () => {
+                    box.style.display = 'none';
+                    opt.action();
+                };
+                opts.appendChild(btn);
+            });
+        }
+
+        // --- ETAPY FABUŁY ---
+
+        function encounterGrandma() {
+            triggerDialog(
+                "Nagle czujesz zapach... bardzo specyficzny. To starsza pani siedząca zaraz za tobą.<br><br><b>Starsza Pani:</b> 'Ach, panie kierowco! Ależ mam piękne perfumy, prawda? Zgadnie pan, czy dałam za nie całe 50 złotych?'",
+                [
+                    { 
+                        label: "Tak, pewnie z 50 zł!", 
+                        action: () => { 
+                            alert("Starsza Pani: 'Co?! Że niby taka rozrzutna jestem?! To z Biedronki!' \n\nZostałeś zgłoszony do dyspozytorni. GAME OVER.");
+                            location.reload();
+                        }
+                    },
+                    { 
+                        label: "E tam, pewnie pani je znalazła.", 
+                        action: () => { 
+                            gameActive = true; 
+                            speed = 0.5;
+                            eventStage = 2; // Następny etap
+                            alert("Starsza Pani: 'Otóż to! Leżały koło śmietnika na osiedlu! Ma pan oko, kawalerze.' \n\nOtrzymujesz +10 punktów Imersji Chełmskiej.");
+                        }
+                    }
+                ]
+            );
+        }
+
+        function encounterMcDonalds() {
+            triggerDialog(
+                "Dojeżdżasz do przystanku: <b>Lubelska McDonald's</b>. Widzisz dziwnego pana w swetrze, który macha rękami. Wygląda na to, że ma problem.",
+                [
+                    {
+                        label: "Otwórz drzwi i zapytaj o co chodzi.",
+                        action: () => {
+                            finalScene();
+                        }
+                    }
+                ]
+            );
+        }
+
+        function finalScene() {
+            triggerDialog(
+                "<b>Pan z problemem:</b> 'Panie kierowco! Gdzie jest autobus do Bańkowszczyzny?! Czekam tu od 1999 roku! Mój burger dawno wystygł!'<br><br>Patrzysz na swój telefon. Aplikacja CLA wariuje. Wyświetla się tylko jeden kierunek: BAŃKOWSZCZYZNA.",
+                [
+                    {
+                        label: "Zabierz go do Bańkowszczyzny (Dobre Zakończenie)",
+                        action: () => {
+                            alert("Zmieniasz tablicę na 'BAŃKOWSZCZYZNA EXPRESS'.\nPan jest szczęśliwy.\nStarsza pani też, bo tam podobno jest więcej darmowych perfum.\n\nWYGRAŁEŚ! Jesteś legendą Chełma.");
+                            location.reload();
+                        }
+                    },
+                    {
+                        label: "Powiedz, że to linia 206 i jedziesz na zajezdnię",
+                        action: () => {
+                            alert("Pan rzuca w autobus zimnym frytkiem.\nWracasz na bazę smutny.\n\nZakończenie Neutralne.");
+                            location.reload();
+                        }
+                    }
+                ]
+            );
+        }
+
+        // --- GŁÓWNA PĘTLA ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (gameActive) {
+                // Ruch autobusu na boki
+                bus.position.x += (busLane * 2.5 - bus.position.x) * 0.1;
+                
+                // Symulacja ruchu do przodu (przesuwanie budynków i drogi)
+                distance += speed * 2;
+                document.getElementById('distance').innerText = Math.floor(distance);
+                document.getElementById('speedometer').innerText = Math.floor(speed * 100);
+
+                buildings.forEach(b => {
+                    b.position.z += speed;
+                    if(b.position.z > 10) {
+                        b.position.z = -100; // Reset pozycji
+                        b.position.x = (Math.random() > 0.5 ? 1 : -1) * (10 + Math.random()*10);
+                    }
+                });
+
+                // Sprawdzanie eventów
+                if (distance > 200 && eventStage === 0) {
+                    eventStage = 1;
+                    encounterGrandma();
+                }
+
+                if (distance > 600 && eventStage === 2) {
+                    eventStage = 3;
+                    encounterMcDonalds();
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Dostosowanie do okna
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
